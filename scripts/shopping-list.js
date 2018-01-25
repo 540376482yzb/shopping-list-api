@@ -1,7 +1,9 @@
-/* global store */
-
+'use strict'
+/* global store API*/
 // eslint-disable-next-line no-unused-vars
 const shoppingList = (function(){
+
+  //====================helper function ============================================
 
   function generateItemElement(item) {
     let itemTitle = `<span class="shopping-item shopping-item__checked">${item.name}</span>`;
@@ -26,13 +28,84 @@ const shoppingList = (function(){
         </div>
       </li>`;
   }
-  
-  
+   
   function generateShoppingItemsString(shoppingList) {
     const items = shoppingList.map((item) => generateItemElement(item));
     return items.join('');
   }
   
+  function getItemIdFromElement(item) {
+    return $(item)
+      .closest('.js-item-element')
+      .data('item-id');
+  }
+
+  //============== event listener functions ================================
+  
+  function handleNewItemSubmit() {
+    $('#js-shopping-list-form').submit(function (event) {
+      event.preventDefault();
+      const newItemName = $('.js-shopping-list-entry').val();
+      $('.js-shopping-list-entry').val('');
+      //create data on server
+      API.createItem(newItemName, newItem => {
+        //create data on local
+        store.addItem(newItem)
+        //render() was called in callback because createItem is async
+        render()
+      })
+    });
+  }
+  
+  function handleItemCheckClicked() {
+    $('.js-shopping-list').on('click', '.js-item-toggle', event => {
+      const id = getItemIdFromElement(event.currentTarget);
+      const item = store.findById(id)
+      API.updateItem(id, {checked: !item.checked}, ()=> {
+        store.findAndUpdate(id, {checked: !item.checked})
+        render()
+      })
+    });
+  }
+
+  function handleDeleteItemClicked() {
+    // like in `handleItemCheckClicked`, we use event delegation
+    $('.js-shopping-list').on('click', '.js-item-delete', event => {
+      // get the index of the item in store.items
+      const id = getItemIdFromElement(event.currentTarget);
+      // delete the item
+      API.deleteItem(id, ()=> {
+        store.findAndDelete(id);
+        render();
+      })
+    });
+  }
+ 
+  function handleEditShoppingItemSubmit() {
+    $('.js-shopping-list').on('submit', '#js-edit-item', event => {
+      event.preventDefault();
+      const id = getItemIdFromElement(event.currentTarget);
+      const itemName = $(event.currentTarget).find('.shopping-item').val();
+      API.updateItem(id, {name: itemName}, ()=> {
+        store.findAndUpdate(id, {name:itemName})
+      })
+    });
+  }
+
+  function handleToggleFilterClick() {
+    $('.js-filter-checked').click(() => {
+      store.toggleCheckedFilter();
+      render();
+    });
+  }
+
+  function handleShoppingListSearch() {
+    $('.js-shopping-list-search-entry').on('keyup', event => {
+      const val = $(event.currentTarget).val();
+      store.setSearchTerm(val);
+      render();
+    });
+  }
   
   function render() {
     // Filter item list if store prop is true by item.checked === false
@@ -53,69 +126,7 @@ const shoppingList = (function(){
     // insert that HTML into the DOM
     $('.js-shopping-list').html(shoppingListItemsString);
   }
-  
-  
-  function handleNewItemSubmit() {
-    $('#js-shopping-list-form').submit(function (event) {
-      event.preventDefault();
-      const newItemName = $('.js-shopping-list-entry').val();
-      $('.js-shopping-list-entry').val('');
-      store.addItem(newItemName);
-      render();
-    });
-  }
-  
-  function getItemIdFromElement(item) {
-    return $(item)
-      .closest('.js-item-element')
-      .data('item-id');
-  }
-  
-  function handleItemCheckClicked() {
-    $('.js-shopping-list').on('click', '.js-item-toggle', event => {
-      const id = getItemIdFromElement(event.currentTarget);
-      store.findAndToggleChecked(id);
-      render();
-    });
-  }
-  
-  function handleDeleteItemClicked() {
-    // like in `handleItemCheckClicked`, we use event delegation
-    $('.js-shopping-list').on('click', '.js-item-delete', event => {
-      // get the index of the item in store.items
-      const id = getItemIdFromElement(event.currentTarget);
-      // delete the item
-      store.findAndDelete(id);
-      // render the updated shopping list
-      render();
-    });
-  }
-  
-  function handleEditShoppingItemSubmit() {
-    $('.js-shopping-list').on('submit', '#js-edit-item', event => {
-      event.preventDefault();
-      const id = getItemIdFromElement(event.currentTarget);
-      const itemName = $(event.currentTarget).find('.shopping-item').val();
-      store.findAndUpdateName(id, itemName);
-      render();
-    });
-  }
-  
-  function handleToggleFilterClick() {
-    $('.js-filter-checked').click(() => {
-      store.toggleCheckedFilter();
-      render();
-    });
-  }
-  
-  function handleShoppingListSearch() {
-    $('.js-shopping-list-search-entry').on('keyup', event => {
-      const val = $(event.currentTarget).val();
-      store.setSearchTerm(val);
-      render();
-    });
-  }
-  
+
   function bindEventListeners() {
     handleNewItemSubmit();
     handleItemCheckClicked();
